@@ -2,21 +2,26 @@ from transformers import AutoModel, AutoTokenizer
 import gradio as gr
 import mdtex2html
 
-tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True)
-model = AutoModel.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True).half().cuda()
+# tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True)
+# model = AutoModel.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True).half().cuda()
+# model = model.eval()
+
+MODEL_PATH = "THUDM\\chatglm-6b-int8"
+tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+model = AutoModel.from_pretrained(MODEL_PATH, trust_remote_code=True).half().cuda()
+# 将模型设置为评估模式
 model = model.eval()
 
-"""Override Chatbot.postprocess"""
 
-
-def postprocess(self, y):
+def postprocess(y):
+    """ 覆写Chatbot.postprocess，用于Chatbot输出的后处理 """
     if y is None:
         return []
     for i, (message, response) in enumerate(y):
-        y[i] = (
-            None if message is None else mdtex2html.convert((message)),
+        y[i] = [
+            None if message is None else mdtex2html.convert(message),  # 将消息和响应中的Markdown文本转换为HTML格式
             None if response is None else mdtex2html.convert(response),
-        )
+        ]
     return y
 
 
@@ -51,7 +56,7 @@ def parse_text(text):
                     line = line.replace("(", "&#40;")
                     line = line.replace(")", "&#41;")
                     line = line.replace("$", "&#36;")
-                lines[i] = "<br>"+line
+                lines[i] = "<br>" + line
     text = "".join(lines)
     return text
 
@@ -60,7 +65,7 @@ def predict(input, chatbot, max_length, top_p, temperature, history):
     chatbot.append((parse_text(input), ""))
     for response, history in model.stream_chat(tokenizer, input, history, max_length=max_length, top_p=top_p,
                                                temperature=temperature):
-        chatbot[-1] = (parse_text(input), parse_text(response))       
+        chatbot[-1] = (parse_text(input), parse_text(response))
 
         yield chatbot, history
 
@@ -80,8 +85,7 @@ with gr.Blocks() as demo:
     with gr.Row():
         with gr.Column(scale=4):
             with gr.Column(scale=12):
-                user_input = gr.Textbox(show_label=False, placeholder="Input...", lines=10).style(
-                    container=False)
+                user_input = gr.Textbox(show_label=False, placeholder="Input...", lines=10).style(container=False)
             with gr.Column(min_width=32, scale=1):
                 submitBtn = gr.Button("Submit", variant="primary")
         with gr.Column(scale=1):
@@ -95,7 +99,6 @@ with gr.Blocks() as demo:
     submitBtn.click(predict, [user_input, chatbot, max_length, top_p, temperature, history], [chatbot, history],
                     show_progress=True)
     submitBtn.click(reset_user_input, [], [user_input])
-
     emptyBtn.click(reset_state, outputs=[chatbot, history], show_progress=True)
 
 demo.queue().launch(share=False, inbrowser=True)

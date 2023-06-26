@@ -132,3 +132,7 @@ dmypy.json
 # Mac system file
 model/
 .idea
+/ai/ChatGLM-6B/THUDM/__init__.py
+/ai/ChatGLM-6B/__init__.py
+/ai/__init__.py
+/THUDM/chatglm-6b-int8
